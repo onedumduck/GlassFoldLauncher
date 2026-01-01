@@ -1,0 +1,36 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <SwitchPreferenceCompat
+    android:key="blur_enabled"
+    android:title="Liquid glass blur"
+    android:defaultValue="true" />
+
+  <SeekBarPreference
+    android:key="dock_alpha"
+    android:title="Dock transparency"
+    android:min="40"
+    android:max="180"
+    android:defaultValue="120" />
+
+  <SeekBarPreference
+    android:key="dock_radius"
+    android:title="Dock corner radius (dp)"
+    android:min="16"
+    android:max="44"
+    android:defaultValue="28" />
+
+  <SeekBarPreference
+    android:key="dock_count"
+    android:title="Dock icons"
+    android:min="3"
+    android:max="8"
+    android:defaultValue="5" />
+
+  <SeekBarPreference
+    android:key="grid_cols"
+    android:title="Grid columns"
+    android:min="4"
+    android:max="8"
+    android:defaultValue="5" />
+
+</PreferenceScreen>
