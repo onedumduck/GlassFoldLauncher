@@ -70,7 +70,21 @@ goto fail
 :execute
 @rem Setup the command line
 
-set CLASSPATH=
+set WRAPPER_JAR=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+if not exist "%WRAPPER_JAR%" (
+    set WRAPPER_URL=https://repo.maven.apache.org/maven2/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar
+    if not exist "%APP_HOME%\gradle\wrapper" mkdir "%APP_HOME%\gradle\wrapper"
+    powershell -Command "try { Invoke-WebRequest -UseBasicParsing -Uri '%WRAPPER_URL%' -OutFile '%WRAPPER_JAR%' } catch { exit 1 }"
+    if %ERRORLEVEL% neq 0 (
+        echo. 1>&2
+        echo ERROR: gradle-wrapper.jar is missing and could not be downloaded automatically. 1>&2
+        echo Attempted: %WRAPPER_URL% 1>&2
+        echo. 1>&2
+        goto fail
+    )
+)
+
+set CLASSPATH=%WRAPPER_JAR%
 
 
 @rem Execute Gradle

@@ -117,6 +117,42 @@ esac
 WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 CLASSPATH="$WRAPPER_JAR"
 
+# Download the wrapper JAR on-the-fly when it is not checked in (e.g., when
+# binaries are disallowed in the repository).
+ensure_wrapper_jar() {
+    if [ -f "$WRAPPER_JAR" ]; then
+        return 0
+    fi
+
+    mkdir -p "${WRAPPER_JAR%/*}" || die "Failed to create wrapper directory"
+
+    jar_version="8.4"
+    jar_url="https://repo.maven.apache.org/maven2/org/gradle/gradle-wrapper/${jar_version}/gradle-wrapper-${jar_version}.jar"
+
+    download_cmd=""
+    if command -v curl >/dev/null 2>&1; then
+        download_cmd="curl -sSfL \"$jar_url\" -o \"$WRAPPER_JAR\""
+    elif command -v wget >/dev/null 2>&1; then
+        download_cmd="wget -q \"$jar_url\" -O \"$WRAPPER_JAR\""
+    fi
+
+    if [ -n "$download_cmd" ]; then
+        # shellcheck disable=SC2086
+        if sh -c "$download_cmd"; then
+            return 0
+        fi
+    fi
+
+    cat >&2 <<EOF
+ERROR: gradle-wrapper.jar is missing and could not be downloaded automatically.
+Attempted: $jar_url
+Please download the file manually and place it at $WRAPPER_JAR
+EOF
+    exit 1
+}
+
+ensure_wrapper_jar
+
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
