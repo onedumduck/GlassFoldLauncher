@@ -219,7 +219,15 @@ if [ -f "$WRAPPER_JAR" ]; then
             "$@"
 else
     if command -v gradle >/dev/null 2>&1; then
-        exec gradle "$@"
+        GRADLE_VERSION=$(
+            gradle --version 2>/dev/null |
+                sed -n 's/^Gradle[[:space:]]\\+\\(.*\\)$/\\1/p' |
+                head -n 1
+        )
+        case "$GRADLE_VERSION" in
+          8.*) exec gradle "$@" ;;
+          *) die "Gradle wrapper JAR is missing and system Gradle '$GRADLE_VERSION' is unsupported. Please use Gradle 8.x or restore the wrapper JAR." ;;
+        esac
     else
         die "Gradle wrapper JAR is missing and no 'gradle' executable was found on PATH."
     fi
