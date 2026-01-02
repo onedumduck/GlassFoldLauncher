@@ -114,7 +114,8 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
-CLASSPATH="\\\"\\\""
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+CLASSPATH="$WRAPPER_JAR"
 
 
 # Determine the Java command to use to start the JVM.
@@ -210,11 +211,27 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 #   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
 #     treated as '${Hostname}' itself on the command line.
 
-set -- \
-        "-Dorg.gradle.appname=$APP_BASE_NAME" \
-        -classpath "$CLASSPATH" \
-        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
-        "$@"
+if [ -f "$WRAPPER_JAR" ]; then
+    set -- \
+            "-Dorg.gradle.appname=$APP_BASE_NAME" \
+            -classpath "$CLASSPATH" \
+            -jar "$WRAPPER_JAR" \
+            "$@"
+else
+    if command -v gradle >/dev/null 2>&1; then
+        GRADLE_VERSION=$(
+            gradle --version 2>/dev/null |
+                sed -n 's/^Gradle[[:space:]]\\+\\(.*\\)$/\\1/p' |
+                head -n 1
+        )
+        case "$GRADLE_VERSION" in
+          8.*) exec gradle "$@" ;;
+          *) die "Gradle wrapper JAR is missing and system Gradle '$GRADLE_VERSION' is unsupported. Please use Gradle 8.x or restore the wrapper JAR." ;;
+        esac
+    else
+        die "Gradle wrapper JAR is missing and no 'gradle' executable was found on PATH."
+    fi
+fi
 
 # Stop when "xargs" is not available.
 if ! command -v xargs >/dev/null 2>&1

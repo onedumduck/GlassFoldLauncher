@@ -6,3 +6,4 @@ local.properties
 *.iml
 *.apk
 app/debug/
+gradle/wrapper/gradle-wrapper.jar
