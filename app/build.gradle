@@ -19,6 +19,12 @@ android {
     release { minifyEnabled false }
   }
 
+  java {
+    toolchain {
+      languageVersion = JavaLanguageVersion.of(17)
+    }
+  }
+
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_17
     targetCompatibility JavaVersion.VERSION_17
@@ -27,6 +33,10 @@ android {
   buildFeatures { viewBinding true }
 
   kotlinOptions { jvmTarget = "17" }
+}
+
+kotlin {
+  jvmToolchain(17)
 }
 
 dependencies {

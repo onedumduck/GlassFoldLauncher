@@ -1,25 +1,3 @@
-def ensureLocalSdk() {
-  def localProps = new File(rootDir, "local.properties")
-  if (localProps.exists()) return
-
-  def candidates = [
-    System.getenv("ANDROID_SDK_ROOT"),
-    System.getenv("ANDROID_HOME"),
-    "/usr/local/lib/android/sdk",
-    "/usr/lib/android-sdk",
-    "${System.getProperty("user.home")}/Android/Sdk"
-  ].findAll { it }
-
-  def sdkPath = candidates.find { new File(it).exists() }
-  if (!sdkPath) return
-
-  localProps.withWriter { writer ->
-    writer.writeLine("sdk.dir=${sdkPath.replace('\\', '\\\\')}")
-  }
-}
-
-ensureLocalSdk()
-
 pluginManagement {
   repositories {
     gradlePluginPortal()
@@ -34,5 +12,28 @@ dependencyResolutionManagement {
     mavenCentral()
   }
 }
+
+def ensureLocalSdk() {
+  def localProps = new File(rootDir, "local.properties")
+  if (localProps.exists()) return
+
+  def candidates = [
+    System.getenv("ANDROID_SDK_ROOT"),
+    System.getenv("ANDROID_HOME"),
+    "/usr/local/lib/android/sdk",
+    "/usr/lib/android-sdk",
+    "${System.getProperty("user.home")}/Android/Sdk"
+  ].findAll { it }
+
+  def sdkPath = candidates.find { it && new File(it).exists() }
+  if (!sdkPath) return
+
+  localProps.withWriter { writer ->
+    writer.writeLine("sdk.dir=${sdkPath.replace('\\', '\\\\')}")
+  }
+}
+
+ensureLocalSdk()
+
 rootProject.name = "GlassFoldLauncher"
 include(":app")
