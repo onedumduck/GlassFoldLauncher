@@ -48,8 +48,15 @@ class HomePagerAdapter(
           vh: RecyclerView.ViewHolder,
           target: RecyclerView.ViewHolder
         ): Boolean {
+          if (!adapter.editMode) return false
           val from = vh.bindingAdapterPosition
           val to = target.bindingAdapterPosition
+          if (
+            from == RecyclerView.NO_POSITION ||
+            to == RecyclerView.NO_POSITION ||
+            from !in 0 until adapter.itemCount ||
+            to !in 0 until adapter.itemCount
+          ) return false
           adapter.swap(from, to)
           return true
         }

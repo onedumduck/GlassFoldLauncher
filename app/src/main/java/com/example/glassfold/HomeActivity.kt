@@ -2,12 +2,10 @@ package com.example.glassfold
 
 import android.app.WallpaperManager
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -37,11 +35,13 @@ class HomeActivity : AppCompatActivity() {
     ActivityResultContracts.OpenDocument()
   ) { uri ->
     uri?.let {
-      contentResolver.takePersistableUriPermission(
-        it,
-        Intent.FLAG_GRANT_READ_URI_PERMISSION
-      )
-      prefs.setFoldedBg(it.toString())
+      runCatching {
+        contentResolver.takePersistableUriPermission(
+          it,
+          Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+        prefs.setFoldedBg(it.toString())
+      }
       applyBackground()
     }
   }
@@ -50,11 +50,13 @@ class HomeActivity : AppCompatActivity() {
     ActivityResultContracts.OpenDocument()
   ) { uri ->
     uri?.let {
-      contentResolver.takePersistableUriPermission(
-        it,
-        Intent.FLAG_GRANT_READ_URI_PERMISSION
-      )
-      prefs.setUnfoldedBg(it.toString())
+      runCatching {
+        contentResolver.takePersistableUriPermission(
+          it,
+          Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+        prefs.setUnfoldedBg(it.toString())
+      }
       applyBackground()
     }
   }
@@ -70,7 +72,7 @@ class HomeActivity : AppCompatActivity() {
 
     prefs = LauncherPrefs(this)
 
-    val apps = queryLaunchableApps()
+    val apps = AppFinder.queryLaunchableApps(this, excludePackage = packageName)
 
     val minCols = if (isUnfolded()) 6 else 4
     val cols = prefs.gridCols(coerceMin = minCols)
@@ -118,7 +120,8 @@ class HomeActivity : AppCompatActivity() {
 
         // Up swipe (mostly vertical)
         if (dy < -180 && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
-          SpotlightSheet(apps).show(supportFragmentManager, "spotlight")
+          SpotlightSheet().apply { setApps(apps) }
+            .show(supportFragmentManager, "spotlight")
           return true
         }
         return false
@@ -163,43 +166,6 @@ class HomeActivity : AppCompatActivity() {
     } catch (_: Exception) {
       binding.bgImage.setImageDrawable(wallpaper ?: fallbackBg)
     }
-  }
-
-  private fun queryLaunchableApps(): List<AppEntry> {
-    val pm = packageManager
-    val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
-      addCategory(Intent.CATEGORY_LAUNCHER)
-    }
-
-    val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      pm.queryIntentActivities(
-        mainIntent,
-        PackageManager.ResolveInfoFlags.of(0)
-      )
-    } else {
-      @Suppress("DEPRECATION")
-      pm.queryIntentActivities(mainIntent, 0)
-    }
-
-    return resolved
-      .filter { it.activityInfo.packageName != packageName }
-      .map {
-        val label = it.loadLabel(pm)?.toString().orEmpty()
-        val icon = it.activityInfo.loadIcon(pm)
-        val launchIntent = Intent().apply {
-          setClassName(it.activityInfo.packageName, it.activityInfo.name)
-          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-
-        AppEntry(
-          label = label,
-          packageName = it.activityInfo.packageName,
-          activityName = it.activityInfo.name,
-          icon = icon,
-          launchIntent = launchIntent
-        )
-      }
-      .sortedBy { it.label.lowercase() }
   }
 
   private fun applyDockStyle() {

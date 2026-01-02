@@ -58,8 +58,12 @@ class AppGridAdapter(
   }
 
   fun swap(from: Int, to: Int) {
+    if (from == to) return
+    if (from !in items.indices || to !in items.indices) return
+
     val item = items.removeAt(from)
-    items.add(to, item)
-    notifyItemMoved(from, to)
+    val safeTo = to.coerceAtMost(items.size)
+    items.add(safeTo, item)
+    notifyItemMoved(from, safeTo)
   }
 }
