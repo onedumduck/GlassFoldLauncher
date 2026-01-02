@@ -63,6 +63,8 @@ class HomeActivity : AppCompatActivity() {
     PreferenceManager.setDefaultValues(this, R.xml.prefs_launcher, false)
     binding = ActivityHomeBinding.inflate(layoutInflater)
     setContentView(binding.root)
+
+    // Safer wallpaper background (prevents overlay/transparent issues and avoids crashes)
     safeWallpaperDrawable()?.let { wallpaper ->
       window.setBackgroundDrawable(null)
       window.setBackgroundDrawable(wallpaper)
@@ -154,10 +156,12 @@ class HomeActivity : AppCompatActivity() {
   private fun applyBackground() {
     val uriStr = if (isUnfolded()) prefs.unfoldedBgUri() else prefs.foldedBgUri()
     val wallpaper = safeWallpaperDrawable()
+
     if (uriStr.isNullOrEmpty()) {
       binding.bgImage.setImageDrawable(wallpaper ?: ColorDrawable(0xFF000000.toInt()))
       return
     }
+
     runCatching { binding.bgImage.setImageURI(Uri.parse(uriStr)) }
       .onFailure {
         binding.bgImage.setImageDrawable(wallpaper ?: ColorDrawable(0xFF000000.toInt()))
@@ -220,7 +224,7 @@ class HomeActivity : AppCompatActivity() {
           "Unable to open ${app.label}",
           Toast.LENGTH_SHORT
         ).show()
-    }
+      }
   }
 
   private fun removeFromPage(app: AppEntry) {
