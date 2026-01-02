@@ -8,6 +8,7 @@
   </queries>
 
   <application
+      android:name=".GlassFoldApp"
       android:allowBackup="true"
       android:label="GlassFold Launcher"
       android:icon="@mipmap/ic_launcher"
