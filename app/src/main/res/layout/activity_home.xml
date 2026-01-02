@@ -3,21 +3,24 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Subtle scrim so icons always readable over wallpaper -->
-    <View
-        android:id="@+id/scrim"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#1A000000"/>
-
     <!-- Pages -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:paddingTop="36dp"
-        android:paddingBottom="120dp"
+        android:paddingBottom="104dp"
         android:clipToPadding="false" />
+
+    <!-- Page dots -->
+    <LinearLayout
+        android:id="@+id/dots"
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="112dp"
+        android:gravity="center"
+        android:orientation="horizontal" />
 
     <!-- iOS-style dock -->
     <FrameLayout

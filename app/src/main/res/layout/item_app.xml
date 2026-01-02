@@ -7,8 +7,8 @@
 
   <ImageView
     android:id="@+id/icon"
-    android:layout_width="56dp"
-    android:layout_height="56dp" />
+    android:layout_width="68dp"
+    android:layout_height="68dp" />
 
   <TextView
     android:id="@+id/label"
@@ -17,7 +17,7 @@
     android:layout_marginTop="6dp"
     android:maxLines="1"
     android:ellipsize="end"
-    android:textSize="12sp"
+    android:textSize="13sp"
     android:textColor="#FFFFFF"
     android:shadowColor="#AA000000"
     android:shadowDx="0"

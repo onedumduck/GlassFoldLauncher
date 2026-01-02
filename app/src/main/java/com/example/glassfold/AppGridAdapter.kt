@@ -2,13 +2,17 @@ package com.example.glassfold
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import androidx.recyclerview.widget.RecyclerView
 import com.example.glassfold.databinding.ItemAppBinding
 
 class AppGridAdapter(
-  private val items: List<AppEntry>,
-  private val onClick: (AppEntry) -> Unit
+  private val items: MutableList<AppEntry>,
+  private val onClick: (AppEntry) -> Unit,
+  private val onLongPress: (() -> Unit)? = null
 ) : RecyclerView.Adapter<AppGridAdapter.ViewHolder>() {
+
+  var editMode: Boolean = false
 
   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
     val inflater = LayoutInflater.from(parent.context)
@@ -28,7 +32,27 @@ class AppGridAdapter(
     fun bind(item: AppEntry) {
       binding.icon.setImageDrawable(item.icon)
       binding.label.text = item.label
-      binding.root.setOnClickListener { onClick(item) }
+
+      if (editMode) {
+        val anim = AnimationUtils.loadAnimation(binding.root.context, R.anim.jiggle)
+        binding.root.startAnimation(anim)
+      } else {
+        binding.root.clearAnimation()
+      }
+
+      binding.root.setOnClickListener {
+        if (!editMode) onClick(item)
+      }
+      binding.root.setOnLongClickListener {
+        onLongPress?.invoke()
+        true
+      }
     }
+  }
+
+  fun swap(from: Int, to: Int) {
+    val item = items.removeAt(from)
+    items.add(to, item)
+    notifyItemMoved(from, to)
   }
 }
