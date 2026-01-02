@@ -3,6 +3,9 @@ package com.example.glassfold
 import android.app.WallpaperManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +31,7 @@ class HomeActivity : AppCompatActivity() {
   private var pagerAdapter: HomePagerAdapter? = null
   private val wallpaperManager by lazy { WallpaperManager.getInstance(this) }
   private var pages: List<MutableList<AppEntry>> = emptyList()
+  private val fallbackBg by lazy { ColorDrawable(Color.BLACK) }
 
   private val pickFoldedBg = registerForActivityResult(
     ActivityResultContracts.OpenDocument()
@@ -62,7 +66,7 @@ class HomeActivity : AppCompatActivity() {
     binding = ActivityHomeBinding.inflate(layoutInflater)
     setContentView(binding.root)
     window.setBackgroundDrawable(null)
-    window.setBackgroundDrawable(wallpaperManager.drawable)
+    window.setBackgroundDrawable(safeWallpaper())
 
     prefs = LauncherPrefs(this)
 
@@ -149,14 +153,15 @@ class HomeActivity : AppCompatActivity() {
 
   private fun applyBackground() {
     val uriStr = if (isUnfolded()) prefs.unfoldedBgUri() else prefs.foldedBgUri()
+    val wallpaper = safeWallpaper()
     if (uriStr.isNullOrEmpty()) {
-      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
+      binding.bgImage.setImageDrawable(wallpaper ?: fallbackBg)
       return
     }
     try {
       binding.bgImage.setImageURI(Uri.parse(uriStr))
     } catch (_: Exception) {
-      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
+      binding.bgImage.setImageDrawable(wallpaper ?: fallbackBg)
     }
   }
 
@@ -259,6 +264,9 @@ class HomeActivity : AppCompatActivity() {
       binding.dots.addView(view)
     }
   }
+
+  private fun safeWallpaper(): Drawable? =
+    runCatching { wallpaperManager.drawable }.getOrNull()
 }
 
 private class DockAdapter(
