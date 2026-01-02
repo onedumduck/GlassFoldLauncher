@@ -1,10 +1,9 @@
 package com.example.glassfold
 
+import android.app.WallpaperManager
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.RenderEffect
-import android.graphics.Shader
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
@@ -13,6 +12,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -23,9 +23,37 @@ import com.example.glassfold.databinding.ItemDockBinding
 class HomeActivity : AppCompatActivity() {
 
   private lateinit var binding: ActivityHomeBinding
-  private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
+  private lateinit var prefs: LauncherPrefs
   private var editMode = false
   private var pagerAdapter: HomePagerAdapter? = null
+  private val wallpaperManager by lazy { WallpaperManager.getInstance(this) }
+  private var pages: List<MutableList<AppEntry>> = emptyList()
+
+  private val pickFoldedBg = registerForActivityResult(
+    ActivityResultContracts.OpenDocument()
+  ) { uri ->
+    uri?.let {
+      contentResolver.takePersistableUriPermission(
+        it,
+        Intent.FLAG_GRANT_READ_URI_PERMISSION
+      )
+      prefs.setFoldedBg(it.toString())
+      applyBackground()
+    }
+  }
+
+  private val pickUnfoldedBg = registerForActivityResult(
+    ActivityResultContracts.OpenDocument()
+  ) { uri ->
+    uri?.let {
+      contentResolver.takePersistableUriPermission(
+        it,
+        Intent.FLAG_GRANT_READ_URI_PERMISSION
+      )
+      prefs.setUnfoldedBg(it.toString())
+      applyBackground()
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -33,18 +61,24 @@ class HomeActivity : AppCompatActivity() {
     PreferenceManager.setDefaultValues(this, R.xml.prefs_launcher, false)
     binding = ActivityHomeBinding.inflate(layoutInflater)
     setContentView(binding.root)
+    window.setBackgroundDrawable(null)
+    window.setBackgroundDrawable(wallpaperManager.drawable)
+
+    prefs = LauncherPrefs(this)
 
     val apps = queryLaunchableApps()
 
-    val minCols = if (resources.configuration.smallestScreenWidthDp >= 600) 6 else 4
+    val minCols = if (isUnfolded()) 6 else 4
     val cols = prefs.gridCols(coerceMin = minCols)
 
-    val rows = if (resources.configuration.smallestScreenWidthDp >= 600) 5 else 4
+    val rows = if (isUnfolded()) 5 else 4
     val perPage = cols * rows
 
-    val pages = apps.chunked(perPage).map { it.toMutableList() }
+    pages = apps.chunked(perPage).map { it.toMutableList() }
     pagerAdapter = HomePagerAdapter(pages, cols, { app ->
       launchApp(app)
+    }, { app ->
+      removeFromPage(app)
     }) {
       setEditMode(true)
     }
@@ -65,6 +99,7 @@ class HomeActivity : AppCompatActivity() {
     binding.dockRow.adapter = dockAdapter
 
     applyDockStyle()
+    applyBackground()
 
     val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
       override fun onFling(
@@ -94,6 +129,34 @@ class HomeActivity : AppCompatActivity() {
     binding.root.setOnLongClickListener {
       setEditMode(!editMode)
       true
+    }
+
+    binding.editMenuBtn.setOnClickListener {
+      binding.editPanel.visibility =
+        if (binding.editPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+    binding.btnBgFolded.setOnClickListener { pickFoldedBg.launch(arrayOf("image/*")) }
+    binding.btnBgUnfolded.setOnClickListener { pickUnfoldedBg.launch(arrayOf("image/*")) }
+  }
+
+  override fun onResume() {
+    super.onResume()
+    applyBackground()
+  }
+
+  private fun isUnfolded(): Boolean =
+    resources.configuration.smallestScreenWidthDp >= 600
+
+  private fun applyBackground() {
+    val uriStr = if (isUnfolded()) prefs.unfoldedBgUri() else prefs.foldedBgUri()
+    if (uriStr.isNullOrEmpty()) {
+      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
+      return
+    }
+    try {
+      binding.bgImage.setImageURI(Uri.parse(uriStr))
+    } catch (_: Exception) {
+      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
     }
   }
 
@@ -135,22 +198,11 @@ class HomeActivity : AppCompatActivity() {
   }
 
   private fun applyDockStyle() {
-    val alpha = prefs.getInt(KEY_DOCK_ALPHA, 120).coerceIn(0, 255)
-    val radiusDp = prefs.getInt(KEY_DOCK_RADIUS, 32).coerceAtLeast(0)
-    val blurEnabled = prefs.getBoolean(KEY_BLUR_ENABLED, true)
+    val alpha = prefs.dockAlpha()
+    val radiusDp = prefs.dockRadius()
 
     val radiusPx = radiusDp * resources.displayMetrics.density
     binding.dockGlass.background = GlassBackgroundDrawable(alpha, radiusPx)
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      binding.dockGlass.setRenderEffect(
-        if (blurEnabled) {
-          RenderEffect.createBlurEffect(30f, 30f, Shader.TileMode.CLAMP)
-        } else {
-          null
-        }
-      )
-    }
   }
 
   private fun launchApp(app: AppEntry) {
@@ -161,17 +213,25 @@ class HomeActivity : AppCompatActivity() {
           "Unable to open ${app.label}",
           Toast.LENGTH_SHORT
         ).show()
-      }
+    }
   }
 
-  private fun SharedPreferences.gridCols(coerceMin: Int): Int =
-    getInt(KEY_GRID_COLS, 5).coerceAtLeast(coerceMin)
-
-  private fun SharedPreferences.dockCount(): Int =
-    getInt(KEY_DOCK_COUNT, 5).coerceAtLeast(0)
+  private fun removeFromPage(app: AppEntry) {
+    val pageIndex = pages.indexOfFirst { it.contains(app) }
+    if (pageIndex >= 0) {
+      val page = pages[pageIndex]
+      val itemIndex = page.indexOf(app)
+      if (itemIndex >= 0) {
+        page.removeAt(itemIndex)
+        pagerAdapter?.adapters?.getOrNull(pageIndex)?.notifyItemRemoved(itemIndex)
+      }
+    }
+  }
 
   private fun setEditMode(enabled: Boolean) {
     editMode = enabled
+    binding.editMenuBtn.visibility = if (enabled) View.VISIBLE else View.GONE
+    if (!enabled) binding.editPanel.visibility = View.GONE
     pagerAdapter?.editMode = enabled
     pagerAdapter?.adapters?.forEach { adapter ->
       adapter?.let {
@@ -198,14 +258,6 @@ class HomeActivity : AppCompatActivity() {
       )
       binding.dots.addView(view)
     }
-  }
-
-  private companion object {
-    const val KEY_BLUR_ENABLED = "blur_enabled"
-    const val KEY_DOCK_ALPHA = "dock_alpha"
-    const val KEY_DOCK_RADIUS = "dock_radius"
-    const val KEY_DOCK_COUNT = "dock_count"
-    const val KEY_GRID_COLS = "grid_cols"
   }
 }
 

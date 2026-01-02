@@ -11,6 +11,7 @@ class HomePagerAdapter(
   private val pages: List<MutableList<AppEntry>>,
   private val cols: Int,
   private val onClick: (AppEntry) -> Unit,
+  private val onRemove: (AppEntry) -> Unit,
   private val onEnterEditMode: (() -> Unit)
 ) : RecyclerView.Adapter<HomePagerAdapter.VH>() {
 
@@ -29,7 +30,9 @@ class HomePagerAdapter(
   override fun onBindViewHolder(holder: VH, position: Int) {
     val list = pages[position]
     holder.b.pageGrid.layoutManager = GridLayoutManager(holder.b.root.context, cols)
-    val adapter = AppGridAdapter(list, onClick) { onEnterEditMode() }
+    val adapter = AppGridAdapter(list, onClick, { onEnterEditMode() }) { app ->
+      onRemove(app)
+    }
     adapter.editMode = editMode
     holder.b.pageGrid.adapter = adapter
 
