@@ -3,6 +3,8 @@ package com.example.glassfold
 import android.app.WallpaperManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -61,8 +63,12 @@ class HomeActivity : AppCompatActivity() {
     PreferenceManager.setDefaultValues(this, R.xml.prefs_launcher, false)
     binding = ActivityHomeBinding.inflate(layoutInflater)
     setContentView(binding.root)
-    window.setBackgroundDrawable(null)
-    window.setBackgroundDrawable(wallpaperManager.drawable)
+
+    // Safer wallpaper background (prevents overlay/transparent issues and avoids crashes)
+    safeWallpaperDrawable()?.let { wallpaper ->
+      window.setBackgroundDrawable(null)
+      window.setBackgroundDrawable(wallpaper)
+    }
 
     prefs = LauncherPrefs(this)
 
@@ -149,15 +155,17 @@ class HomeActivity : AppCompatActivity() {
 
   private fun applyBackground() {
     val uriStr = if (isUnfolded()) prefs.unfoldedBgUri() else prefs.foldedBgUri()
+    val wallpaper = safeWallpaperDrawable()
+
     if (uriStr.isNullOrEmpty()) {
-      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
+      binding.bgImage.setImageDrawable(wallpaper ?: ColorDrawable(0xFF000000.toInt()))
       return
     }
-    try {
-      binding.bgImage.setImageURI(Uri.parse(uriStr))
-    } catch (_: Exception) {
-      binding.bgImage.setImageDrawable(wallpaperManager.drawable)
-    }
+
+    runCatching { binding.bgImage.setImageURI(Uri.parse(uriStr)) }
+      .onFailure {
+        binding.bgImage.setImageDrawable(wallpaper ?: ColorDrawable(0xFF000000.toInt()))
+      }
   }
 
   private fun queryLaunchableApps(): List<AppEntry> {
@@ -205,6 +213,9 @@ class HomeActivity : AppCompatActivity() {
     binding.dockGlass.background = GlassBackgroundDrawable(alpha, radiusPx)
   }
 
+  private fun safeWallpaperDrawable(): Drawable? =
+    runCatching { wallpaperManager.drawable }.getOrNull()
+
   private fun launchApp(app: AppEntry) {
     runCatching { startActivity(app.launchIntent) }
       .onFailure {
@@ -213,7 +224,7 @@ class HomeActivity : AppCompatActivity() {
           "Unable to open ${app.label}",
           Toast.LENGTH_SHORT
         ).show()
-    }
+      }
   }
 
   private fun removeFromPage(app: AppEntry) {
