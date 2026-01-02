@@ -5,4 +5,4 @@
     android:clipToPadding="false"
     android:paddingLeft="10dp"
     android:paddingRight="10dp"
-    android:paddingBottom="20dp" />
+    android:paddingBottom="8dp" />

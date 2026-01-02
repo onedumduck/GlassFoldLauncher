@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +24,8 @@ class HomeActivity : AppCompatActivity() {
 
   private lateinit var binding: ActivityHomeBinding
   private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
+  private var editMode = false
+  private var pagerAdapter: HomePagerAdapter? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -38,11 +42,21 @@ class HomeActivity : AppCompatActivity() {
     val rows = if (resources.configuration.smallestScreenWidthDp >= 600) 5 else 4
     val perPage = cols * rows
 
-    val pages = apps.chunked(perPage)
-    binding.pager.adapter = HomePagerAdapter(pages, cols) { app ->
+    val pages = apps.chunked(perPage).map { it.toMutableList() }
+    pagerAdapter = HomePagerAdapter(pages, cols, { app ->
       launchApp(app)
+    }) {
+      setEditMode(true)
     }
+    binding.pager.adapter = pagerAdapter
     binding.pager.orientation = ViewPager2.ORIENTATION_HORIZONTAL
+    renderDots(pages.size, 0)
+
+    binding.pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+      override fun onPageSelected(position: Int) {
+        renderDots(pages.size, position)
+      }
+    })
 
     val dockItems = apps.take(prefs.dockCount())
     val dockAdapter = DockAdapter(dockItems) { launchApp(it) }
@@ -64,7 +78,7 @@ class HomeActivity : AppCompatActivity() {
         val dx = e2.x - e1.x
 
         // Up swipe (mostly vertical)
-        if (dy < -200 && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+        if (dy < -180 && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
           SpotlightSheet(apps).show(supportFragmentManager, "spotlight")
           return true
         }
@@ -75,6 +89,11 @@ class HomeActivity : AppCompatActivity() {
     binding.root.setOnTouchListener { _, event ->
       detector.onTouchEvent(event)
       false
+    }
+
+    binding.root.setOnLongClickListener {
+      setEditMode(!editMode)
+      true
     }
   }
 
@@ -117,7 +136,7 @@ class HomeActivity : AppCompatActivity() {
 
   private fun applyDockStyle() {
     val alpha = prefs.getInt(KEY_DOCK_ALPHA, 120).coerceIn(0, 255)
-    val radiusDp = prefs.getInt(KEY_DOCK_RADIUS, 28).coerceAtLeast(0)
+    val radiusDp = prefs.getInt(KEY_DOCK_RADIUS, 32).coerceAtLeast(0)
     val blurEnabled = prefs.getBoolean(KEY_BLUR_ENABLED, true)
 
     val radiusPx = radiusDp * resources.displayMetrics.density
@@ -150,6 +169,36 @@ class HomeActivity : AppCompatActivity() {
 
   private fun SharedPreferences.dockCount(): Int =
     getInt(KEY_DOCK_COUNT, 5).coerceAtLeast(0)
+
+  private fun setEditMode(enabled: Boolean) {
+    editMode = enabled
+    pagerAdapter?.editMode = enabled
+    pagerAdapter?.adapters?.forEach { adapter ->
+      adapter?.let {
+        it.editMode = enabled
+        it.notifyDataSetChanged()
+      }
+    }
+  }
+
+  private fun renderDots(count: Int, active: Int) {
+    binding.dots.removeAllViews()
+    if (count <= 0) return
+
+    val size = (6 * resources.displayMetrics.density).toInt()
+    val pad = (6 * resources.displayMetrics.density).toInt()
+
+    repeat(count) { index ->
+      val view = View(this)
+      val lp = LinearLayout.LayoutParams(size, size)
+      lp.setMargins(pad, 0, pad, 0)
+      view.layoutParams = lp
+      view.background = getDrawable(
+        if (index == active) R.drawable.dot_active else R.drawable.dot
+      )
+      binding.dots.addView(view)
+    }
+  }
 
   private companion object {
     const val KEY_BLUR_ENABLED = "blur_enabled"
