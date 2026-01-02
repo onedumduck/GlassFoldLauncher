@@ -1,6 +1,7 @@
 package com.example.glassfold
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -55,7 +56,15 @@ class HomeActivity : AppCompatActivity() {
       addCategory(Intent.CATEGORY_LAUNCHER)
     }
 
-    val resolved = pm.queryIntentActivities(mainIntent, 0)
+    val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      pm.queryIntentActivities(
+        mainIntent,
+        PackageManager.ResolveInfoFlags.of(0)
+      )
+    } else {
+      @Suppress("DEPRECATION")
+      pm.queryIntentActivities(mainIntent, 0)
+    }
     return resolved
       .filter { it.activityInfo.packageName != packageName }
       .map {
