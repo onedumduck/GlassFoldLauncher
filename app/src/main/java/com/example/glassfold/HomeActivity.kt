@@ -1,23 +1,21 @@
 package com.example.glassfold
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.graphics.RenderEffect
 import android.graphics.Shader
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.example.glassfold.databinding.ActivityHomeBinding
-import com.example.glassfold.databinding.ItemAppBinding
 import com.example.glassfold.databinding.ItemDockBinding
 
 class HomeActivity : AppCompatActivity() {
@@ -32,25 +30,55 @@ class HomeActivity : AppCompatActivity() {
     binding = ActivityHomeBinding.inflate(layoutInflater)
     setContentView(binding.root)
 
-    val gridColumns = prefs.getInt(KEY_GRID_COLS, 5).coerceAtLeast(3)
-    val dockCount = prefs.getInt(KEY_DOCK_COUNT, 5).coerceAtLeast(0)
+    val apps = queryLaunchableApps()
 
-    val apps = loadLaunchableApps()
+    val minCols = if (resources.configuration.smallestScreenWidthDp >= 600) 6 else 4
+    val cols = prefs.gridCols(coerceMin = minCols)
 
-    val appAdapter = AppAdapter(apps) { launchApp(it) }
-    binding.appGrid.layoutManager = GridLayoutManager(this, gridColumns)
-    binding.appGrid.adapter = appAdapter
+    val rows = if (resources.configuration.smallestScreenWidthDp >= 600) 5 else 4
+    val perPage = cols * rows
 
-    val dockItems = apps.take(dockCount)
+    val pages = apps.chunked(perPage)
+    binding.pager.adapter = HomePagerAdapter(pages, cols) { app ->
+      launchApp(app)
+    }
+    binding.pager.orientation = ViewPager2.ORIENTATION_HORIZONTAL
+
+    val dockItems = apps.take(prefs.dockCount())
     val dockAdapter = DockAdapter(dockItems) { launchApp(it) }
     binding.dockRow.layoutManager =
       LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
     binding.dockRow.adapter = dockAdapter
 
     applyDockStyle()
+
+    val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+      override fun onFling(
+        e1: MotionEvent?,
+        e2: MotionEvent,
+        velocityX: Float,
+        velocityY: Float
+      ): Boolean {
+        if (e1 == null) return false
+        val dy = e2.y - e1.y
+        val dx = e2.x - e1.x
+
+        // Up swipe (mostly vertical)
+        if (dy < -200 && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+          SpotlightSheet(apps).show(supportFragmentManager, "spotlight")
+          return true
+        }
+        return false
+      }
+    })
+
+    binding.root.setOnTouchListener { _, event ->
+      detector.onTouchEvent(event)
+      false
+    }
   }
 
-  private fun loadLaunchableApps(): List<LaunchableApp> {
+  private fun queryLaunchableApps(): List<AppEntry> {
     val pm = packageManager
     val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
       addCategory(Intent.CATEGORY_LAUNCHER)
@@ -65,16 +93,23 @@ class HomeActivity : AppCompatActivity() {
       @Suppress("DEPRECATION")
       pm.queryIntentActivities(mainIntent, 0)
     }
+
     return resolved
       .filter { it.activityInfo.packageName != packageName }
       .map {
         val label = it.loadLabel(pm)?.toString().orEmpty()
         val icon = it.activityInfo.loadIcon(pm)
-        LaunchableApp(
+        val launchIntent = Intent().apply {
+          setClassName(it.activityInfo.packageName, it.activityInfo.name)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        AppEntry(
           label = label,
           packageName = it.activityInfo.packageName,
           activityName = it.activityInfo.name,
-          icon = icon
+          icon = icon,
+          launchIntent = launchIntent
         )
       }
       .sortedBy { it.label.lowercase() }
@@ -85,13 +120,8 @@ class HomeActivity : AppCompatActivity() {
     val radiusDp = prefs.getInt(KEY_DOCK_RADIUS, 28).coerceAtLeast(0)
     val blurEnabled = prefs.getBoolean(KEY_BLUR_ENABLED, true)
 
-    val shape = GradientDrawable().apply {
-      val radiusPx = radiusDp * resources.displayMetrics.density
-      cornerRadius = radiusPx
-      setColor(Color.argb(alpha, 24, 24, 24))
-    }
-
-    binding.dockGlass.background = shape
+    val radiusPx = radiusDp * resources.displayMetrics.density
+    binding.dockGlass.background = GlassBackgroundDrawable(alpha, radiusPx)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       binding.dockGlass.setRenderEffect(
@@ -104,13 +134,8 @@ class HomeActivity : AppCompatActivity() {
     }
   }
 
-  private fun launchApp(app: LaunchableApp) {
-    val intent = Intent().apply {
-      setClassName(app.packageName, app.activityName)
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-
-    runCatching { startActivity(intent) }
+  private fun launchApp(app: AppEntry) {
+    runCatching { startActivity(app.launchIntent) }
       .onFailure {
         Toast.makeText(
           this,
@@ -119,6 +144,12 @@ class HomeActivity : AppCompatActivity() {
         ).show()
       }
   }
+
+  private fun SharedPreferences.gridCols(coerceMin: Int): Int =
+    getInt(KEY_GRID_COLS, 5).coerceAtLeast(coerceMin)
+
+  private fun SharedPreferences.dockCount(): Int =
+    getInt(KEY_DOCK_COUNT, 5).coerceAtLeast(0)
 
   private companion object {
     const val KEY_BLUR_ENABLED = "blur_enabled"
@@ -129,45 +160,10 @@ class HomeActivity : AppCompatActivity() {
   }
 }
 
-private data class LaunchableApp(
-  val label: String,
-  val packageName: String,
-  val activityName: String,
-  val icon: Drawable
-)
-
-private class AppAdapter(
-  private val items: List<LaunchableApp>,
-  private val onClick: (LaunchableApp) -> Unit
-) : RecyclerView.Adapter<AppAdapter.ViewHolder>() {
-
-  override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): ViewHolder {
-    val inflater = android.view.LayoutInflater.from(parent.context)
-    val binding = ItemAppBinding.inflate(inflater, parent, false)
-    return ViewHolder(binding)
-  }
-
-  override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-    holder.bind(items[position])
-  }
-
-  override fun getItemCount(): Int = items.size
-
-  inner class ViewHolder(private val binding: ItemAppBinding) :
-    RecyclerView.ViewHolder(binding.root) {
-
-    fun bind(item: LaunchableApp) {
-      binding.icon.setImageDrawable(item.icon)
-      binding.label.text = item.label
-      binding.root.setOnClickListener { onClick(item) }
-    }
-  }
-}
-
 private class DockAdapter(
-  private val items: List<LaunchableApp>,
-  private val onClick: (LaunchableApp) -> Unit
-) : RecyclerView.Adapter<DockAdapter.ViewHolder>() {
+  private val items: List<AppEntry>,
+  private val onClick: (AppEntry) -> Unit
+) : androidx.recyclerview.widget.RecyclerView.Adapter<DockAdapter.ViewHolder>() {
 
   override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): ViewHolder {
     val inflater = android.view.LayoutInflater.from(parent.context)
@@ -182,9 +178,9 @@ private class DockAdapter(
   override fun getItemCount(): Int = items.size
 
   inner class ViewHolder(private val binding: ItemDockBinding) :
-    RecyclerView.ViewHolder(binding.root) {
+    androidx.recyclerview.widget.RecyclerView.ViewHolder(binding.root) {
 
-    fun bind(item: LaunchableApp) {
+    fun bind(item: AppEntry) {
       binding.icon.setImageDrawable(item.icon)
       binding.root.setOnClickListener { onClick(item) }
     }

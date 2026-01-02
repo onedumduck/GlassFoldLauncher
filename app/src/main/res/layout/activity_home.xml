@@ -1,29 +1,38 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-  android:id="@+id/root"
-  android:layout_width="match_parent"
-  android:layout_height="match_parent">
-
-  <androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/appGrid"
+    android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:paddingBottom="120dp"
-    android:clipToPadding="false"/>
+    android:layout_height="match_parent">
 
-  <!-- iOS-style dock -->
-  <FrameLayout
-    android:id="@+id/dockGlass"
-    android:layout_width="match_parent"
-    android:layout_height="92dp"
-    android:layout_gravity="bottom"
-    android:layout_margin="16dp"
-    android:padding="10dp">
+    <!-- Subtle scrim so icons always readable over wallpaper -->
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#1A000000"/>
 
-    <androidx.recyclerview.widget.RecyclerView
-      android:id="@+id/dockRow"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:overScrollMode="never"/>
-  </FrameLayout>
+    <!-- Pages -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingTop="36dp"
+        android:paddingBottom="120dp"
+        android:clipToPadding="false" />
+
+    <!-- iOS-style dock -->
+    <FrameLayout
+        android:id="@+id/dockGlass"
+        android:layout_width="match_parent"
+        android:layout_height="92dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:padding="10dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/dockRow"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="never" />
+    </FrameLayout>
 
 </FrameLayout>

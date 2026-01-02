@@ -1,0 +1,25 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/query"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="Search apps or Google"
+        android:padding="12dp"
+        android:background="@android:drawable/editbox_background"
+        android:imeOptions="actionSearch"
+        android:inputType="text"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#AFFFFFFF" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/results"
+        android:layout_width="match_parent"
+        android:layout_height="360dp"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout>
