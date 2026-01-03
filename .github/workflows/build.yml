@@ -19,12 +19,24 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Gradle Wrapper (if missing)
+      - name: Prepare Gradle Wrapper
         run: |
+          set -euo pipefail
+
+          distribution_url=$(grep '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties | cut -d= -f2-)
+          gradle_version=$(printf '%s' "$distribution_url" | sed -E 's#.*/gradle-([^-]+)-.*#\1#')
+
           if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.2
+            gradle wrapper --gradle-version "$gradle_version"
           fi
           chmod +x ./gradlew
+
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            temp_dir=$(mktemp -d)
+            curl -L "https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip" -o "${temp_dir}/gradle.zip"
+            unzip -p "${temp_dir}/gradle.zip" "gradle-${gradle_version}/lib/plugins/gradle-wrapper-${gradle_version}.jar" > gradle/wrapper/gradle-wrapper.jar
+            rm -rf "${temp_dir}"
+          fi
 
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug
